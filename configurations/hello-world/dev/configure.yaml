@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: configmap-template
+metadata:
+  name: configmap-template
+
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: ${SERVICE_NAME}-${SERVICE_VERSION_DASH}-config
+    labels:
+      app: ${SERVICE_NAME}
+      version: ${SERVICE_VERSION}
+  data:
+    application.properties: |
+      server.port=8080
+      service.version=v1
+#END add 20210609
+parameters:
+- name: SERVICE_NAME
+  required: true
+- name: SERVICE_VERSION
+  required: true
+- name: SERVICE_VERSION_DASH
+  required: true
