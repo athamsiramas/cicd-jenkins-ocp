@@ -1,0 +1,67 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+labels:
+  template: deployment-template
+metadata:
+  name: deployment-template
+objects:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: ${SERVICE_NAME}
+      version: ${SERVICE_VERSION}
+    name: ${SERVICE_NAME}-${DEPLOYMENT_NAME}-deployment
+  spec:
+    replicas: 1
+    strategy:
+      type: RollingUpdate
+    selector:
+      matchLabels:
+        name: ${SERVICE_NAME}-${DEPLOYMENT_NAME}-deployment
+    template:
+      metadata:
+        labels:
+          app: ${SERVICE_NAME}
+          version: ${SERVICE_VERSION}
+          name: ${SERVICE_NAME}-${DEPLOYMENT_NAME}-deployment
+      spec:
+        containers:
+        - image: "image-registry.openshift-image-registry.svc:5000/cicd-test/${SERVICE_NAME}:${SERVICE_VERSION}"
+          name: ${SERVICE_NAME}-${DEPLOYMENT_NAME}-service
+          volumeMounts:
+          - name: ${SERVICE_NAME}-${DEPLOYMENT_NAME}-volume
+            mountPath: "/application.properties"
+            subPath: "application.properties"
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          imagePullPolicy: Always
+        volumes:
+        - configMap:
+            name: ${SERVICE_NAME}-${SERVICE_VERSION_DASH}-config
+          name: ${SERVICE_NAME}-${DEPLOYMENT_NAME}-volume
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: ${SERVICE_NAME}
+      version: ${SERVICE_VERSION}
+    name: ${SERVICE_NAME}-${DEPLOYMENT_NAME}-service
+  spec:
+    ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: ${SERVICE_NAME}
+      version: ${SERVICE_VERSION}
+parameters:
+- name: SERVICE_NAME
+  required: true
+- name: SERVICE_VERSION
+  required: true
+- name: SERVICE_VERSION_DASH
+  required: true
+- name: DEPLOYMENT_NAME
+  required: true
