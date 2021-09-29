@@ -24,10 +24,6 @@ pipeline {
                     sh "mkdir -p ${WORKSPACE}/configurations"
                     sh "mkdir -p ${WORKSPACE}/deploy"
 
-                    if (ref.contains('refs/heads/')) {
-                        ref = ref.replace('refs/heads/', '')
-                    }
-
                     dir ("${WORKSPACE}/configurations") {
                         checkout scm: [$class: 'GitSCM',
                             userRemoteConfigs: [[url: "https://github.com/athamsiramas/cicd-jenkins-ocp.git", credentialsId: 'git-login']],
@@ -39,7 +35,7 @@ pipeline {
                     }
                     
                     activeAppAndVersion = sh(returnStdout: true, script: "oc get svc -l app=${serviceName} -n appuat -o jsonpath='{range .items[*].metadata}{.name}{end}'").trim()
-                    if (activeApp) {
+                    if (activeAppAndVersion) {
                         def active = activeAppAndVersion.split(":")
                         activeAppVersion = active[1]
                         if (active[0] == "${serviceName}-blue-service") {
@@ -89,7 +85,7 @@ pipeline {
                         binding.SERVICE_NAME = serviceName
                         binding.SERVICE_VERSION = serviceVersion
                         binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll(".", "-")
-                        binding.DEPLOYMENT_NAME = 'main'
+                        binding.DEPLOYMENT_NAME = deploymentName
                         def paramsStr = createOcParams(binding)
                         
                         echo "Creating new deployment for ${serviceName}"
@@ -109,7 +105,7 @@ pipeline {
                         ).trim()
                         if (!ROUTE_QUERY_RESULT) {
                             echo "Route doesn't exist. Creating new route for ${serviceName}"
-                            sh "oc expose svc/${serviceName}-main-service -n appuat --name=${serviceName}-main-route -l app=${serviceName}"
+                            sh "oc expose svc/${serviceName}-${deploymentName}-service -n appuat --name=${serviceName}-route -l app=${serviceName}"
                         }
 
                         if (deploymentStrategy == 'rollout') {
