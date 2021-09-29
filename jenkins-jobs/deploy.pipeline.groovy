@@ -34,11 +34,11 @@ pipeline {
                         ]
                     }
                     
-                    activeAppAndVersion = sh(returnStdout: true, script: "oc get svc -l app=${serviceName} -n appuat -o jsonpath='{range .items[*].metadata}{.name}{end}'").trim()
+                    activeAppAndVersion = sh(returnStdout: true, script: "oc get svc -l app=${serviceName} -n appuat -o jsonpath='{range .items[*].metadata}{.name}:{.labels.version}{end}'").trim()
                     if (activeAppAndVersion) {
                         def active = activeAppAndVersion.split(":")
                         activeAppVersion = active[1]
-                        if (active[0] == "${serviceName}-blue-service") {
+                        if (deploymentStrategy != 'rollout' && active[0] == "${serviceName}-blue-service") {
                             deploymentName = 'green'
                         }
                     }
@@ -54,7 +54,7 @@ pipeline {
                         def binding = [:]
                         binding.SERVICE_NAME = serviceName
                         binding.SERVICE_VERSION = serviceVersion
-                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll(".", "-")
+                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll("\\.", "-")
                         def paramsStr = createOcParams(binding)
                         if (fileExists("${WORKSPACE}/configurations/openshift/${serviceName}/${environment}/configure.yaml")) {
                             sh "cp ${WORKSPACE}/configurations/openshift/${serviceName}/${environment}/configure.yaml configure.yaml"
@@ -62,7 +62,7 @@ pipeline {
                             sh "cp ${WORKSPACE}/configurations/openshift/${serviceName}/configure.yaml configure.yaml"
                         }
                         
-                        sh "oc process -f configure.yaml ${paramsStr} | oc apply -n appuat -f -"
+                        sh "oc process -f configure.yaml ${paramsStr} -n appuat | oc apply -n appuat -f -"
                     }
                 }
             }
@@ -72,8 +72,8 @@ pipeline {
             steps {
                 dir("${WORKSPACE}/deploy") {
                     script {
-                        if (fileExists("${WORKSPACE}/configurations/openshift/${serviceName}/dev/deployment.yaml")) {
-                            sh "cp ${WORKSPACE}/configurations/openshift/${serviceName}/dev/deployment.yaml deployment.yaml"
+                        if (fileExists("${WORKSPACE}/configurations/openshift/${serviceName}/${environment}/deployment.yaml")) {
+                            sh "cp ${WORKSPACE}/configurations/openshift/${serviceName}/${environment}/deployment.yaml deployment.yaml"
                         } else if (fileExists("${WORKSPACE}/configurations/openshift/${serviceName}/deployment.yaml")) {
                             sh "cp ${WORKSPACE}/configurations/openshift/${serviceName}/deployment.yaml deployment.yaml"
                         } else {
@@ -84,12 +84,12 @@ pipeline {
                         def binding = [:]
                         binding.SERVICE_NAME = serviceName
                         binding.SERVICE_VERSION = serviceVersion
-                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll(".", "-")
+                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll("\\.", "-")
                         binding.DEPLOYMENT_NAME = deploymentName
                         def paramsStr = createOcParams(binding)
                         
                         echo "Creating new deployment for ${serviceName}"
-                        sh "oc process -f deployment.yaml ${paramsStr} | oc apply -n appuat -f -"
+                        sh "oc process -f deployment.yaml ${paramsStr} -n appuat | oc apply -n appuat -f -"
                     }
                 }
             }
@@ -109,7 +109,15 @@ pipeline {
                         }
 
                         if (deploymentStrategy == 'rollout') {
-                            sh "oc delete all -l app=${serviceName} -l version=${serviceVersion} -n appuat"
+                            SERVICE_VERSION_QUERY_RESULT = sh (
+                                script: "oc get cm -n appuat -l app=${serviceName} -o jsonpath='{range .items[*].metadata}{.labels.version}{end}'",
+                                returnStdout: true
+                            ).trim()
+
+                            def removingVersion = SERVICE_VERSION_QUERY_RESULT.split("\n").find { it != (serviceVersion) }
+                            if (removingVersion) {
+                                sh "oc delete all -n appuat -l app=${serviceName} -l version=${removingVersion}"
+                            }
                         }
                     }
                 }
@@ -120,7 +128,7 @@ pipeline {
             steps {
                 dir("${WORKSPACE}/deploy") {
                     script {
-                        sh "oc wait --for=condition=Ready pod -l app=${serviceName} -l version=${serviceVersion} --timeout=120s"
+                        sh "oc wait --for=condition=Ready pod -l app=${serviceName} -l version=${serviceVersion} -n appuat --timeout=120s"
                     }
                 }
             }

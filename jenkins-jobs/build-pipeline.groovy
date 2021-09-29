@@ -120,7 +120,7 @@ pipeline {
                         def binding = [:]
                         binding.SERVICE_NAME = serviceName
                         binding.SERVICE_VERSION = serviceVersion
-                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll(".", "-")
+                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll("\\.", "-")
                         def paramsStr = createOcParams(binding)
                         if (fileExists("${WORKSPACE}/configurations/openshift/${serviceName}/dev/configure.yaml")) {
                             sh "cp ${WORKSPACE}/configurations/openshift/${serviceName}/dev/configure.yaml configure.yaml"
@@ -149,7 +149,7 @@ pipeline {
                         def binding = [:]
                         binding.SERVICE_NAME = serviceName
                         binding.SERVICE_VERSION = serviceVersion
-                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll(".", "-")
+                        binding.SERVICE_VERSION_DASH = serviceVersion.replaceAll("\\.", "-")
                         binding.DEPLOYMENT_NAME = 'main'
                         def paramsStr = createOcParams(binding)
                         
